@@ -187,8 +187,22 @@ export async function createImportRecord(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  return await db.insert(importRecords).values(data);
+
+  // Insert import record
+  const result = await db.insert(importRecords).values(data);
+
+  // Update currentStock and expiryDate on the medicine
+  const medicine = await getMedicineById(data.medicineId);
+  if (medicine) {
+    await db.update(medicines)
+      .set({
+        currentStock: medicine.currentStock + data.quantity,
+        expiryDate: data.expiryDate,
+      })
+      .where(eq(medicines.id, data.medicineId));
+  }
+
+  return result;
 }
 
 export async function getImportRecords(limit: number = 100, offset: number = 0) {
@@ -223,8 +237,20 @@ export async function createExportRecord(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  return await db.insert(exportRecords).values(data);
+
+  // Insert export record
+  const result = await db.insert(exportRecords).values(data);
+
+  // Deduct currentStock on the medicine
+  const medicine = await getMedicineById(data.medicineId);
+  if (medicine) {
+    const newStock = Math.max(0, medicine.currentStock - data.quantity);
+    await db.update(medicines)
+      .set({ currentStock: newStock })
+      .where(eq(medicines.id, data.medicineId));
+  }
+
+  return result;
 }
 
 export async function createExportItem(data: {
