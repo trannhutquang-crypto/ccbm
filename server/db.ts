@@ -426,17 +426,25 @@ export type MonthlyReportRow = {
   name: string;
   unit: string;
   retailPrice: string | null;
-  openingStock: number;       // Tồn đầu kỳ
+  openingStock: number;
   openingValue: number;
-  importQty: number;          // Nhập trong kỳ
+  importQty: number;
   importValue: number;
-  totalQty: number;           // Tổng cộng
+  totalQty: number;
   totalValue: number;
-  exportQty: number;          // Xuất trong kỳ
+  exportQty: number;
   exportValue: number;
-  closingStock: number;       // Tồn cuối kỳ
+  closingStock: number;
   closingValue: number;
 };
+
+/** Format a Date to YYYY-MM-DD string (local date, no timezone shift) */
+function toDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export async function getMonthlyReport(
   month: number,
@@ -445,106 +453,86 @@ export async function getMonthlyReport(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Period boundaries
-  const periodStart = new Date(year, month - 1, 1);
-  const periodEnd   = new Date(year, month, 1); // exclusive
+  // Date strings for the period (inclusive)
+  const firstDay = toDateStr(new Date(year, month - 1, 1));
+  const lastDay  = toDateStr(new Date(year, month, 0));       // day 0 = last day of prev month+1
+  // Last day of previous month
+  const lastDayPrev = toDateStr(new Date(year, month - 1, 0));
 
-  // Previous period end = day before periodStart
-  const prevEnd = new Date(periodStart.getTime() - 1);
-
-  // Fetch all medicines
+  // Fetch all medicines sorted by name
   const allMedicines = await db.select().from(medicines).orderBy(medicines.name);
 
-  // Fetch all imports in period
-  const importsInPeriod = await db
-    .select()
-    .from(importRecords)
-    .where(
-      and(
-        gte(importRecords.importDate, periodStart),
-        lte(importRecords.importDate, prevEnd.getTime() < periodStart.getTime() ? periodEnd : periodEnd)
-      )
-    );
-
-  // Re-fetch with correct date range
-  const importsThisMonth = await db
-    .select()
-    .from(importRecords)
-    .where(
-      and(
-        gte(importRecords.importDate, periodStart),
-        lte(importRecords.importDate, new Date(year, month - 1, 31, 23, 59, 59))
-      )
-    );
-
-  const exportsThisMonth = await db
-    .select()
-    .from(exportRecords)
-    .where(
-      and(
-        gte(exportRecords.exportDate, periodStart),
-        lte(exportRecords.exportDate, new Date(year, month - 1, 31, 23, 59, 59))
-      )
-    );
-
-  // Fetch ALL imports/exports before this period to compute opening stock
+  // All imports BEFORE this month (to compute opening stock)
   const importsBefore = await db
-    .select()
+    .select({ medicineId: importRecords.medicineId, quantity: importRecords.quantity })
     .from(importRecords)
-    .where(lte(importRecords.importDate, new Date(year, month - 1, 0, 23, 59, 59)));
+    .where(lte(importRecords.importDate, new Date(lastDayPrev + "T23:59:59")));
 
+  // All exports BEFORE this month
   const exportsBefore = await db
-    .select()
+    .select({ medicineId: exportRecords.medicineId, quantity: exportRecords.quantity })
     .from(exportRecords)
-    .where(lte(exportRecords.exportDate, new Date(year, month - 1, 0, 23, 59, 59)));
+    .where(lte(exportRecords.exportDate, new Date(lastDayPrev + "T23:59:59")));
 
-  // Build lookup maps
-  const importBeforeMap: Record<number, number> = {};
-  for (const r of importsBefore) {
-    importBeforeMap[r.medicineId] = (importBeforeMap[r.medicineId] ?? 0) + r.quantity;
-  }
-  const exportBeforeMap: Record<number, number> = {};
-  for (const r of exportsBefore) {
-    exportBeforeMap[r.medicineId] = (exportBeforeMap[r.medicineId] ?? 0) + r.quantity;
-  }
-  const importThisMap: Record<number, number> = {};
-  for (const r of importsThisMonth) {
-    importThisMap[r.medicineId] = (importThisMap[r.medicineId] ?? 0) + r.quantity;
-  }
-  const exportThisMap: Record<number, number> = {};
-  for (const r of exportsThisMonth) {
-    exportThisMap[r.medicineId] = (exportThisMap[r.medicineId] ?? 0) + r.quantity;
-  }
+  // Imports IN this month
+  const importsThis = await db
+    .select({ medicineId: importRecords.medicineId, quantity: importRecords.quantity })
+    .from(importRecords)
+    .where(and(
+      gte(importRecords.importDate, new Date(firstDay + "T00:00:00")),
+      lte(importRecords.importDate, new Date(lastDay  + "T23:59:59")),
+    ));
+
+  // Exports IN this month
+  const exportsThis = await db
+    .select({ medicineId: exportRecords.medicineId, quantity: exportRecords.quantity })
+    .from(exportRecords)
+    .where(and(
+      gte(exportRecords.exportDate, new Date(firstDay + "T00:00:00")),
+      lte(exportRecords.exportDate, new Date(lastDay  + "T23:59:59")),
+    ));
+
+  // Build aggregation maps
+  const sum = (rows: { medicineId: number; quantity: number }[]) => {
+    const map: Record<number, number> = {};
+    for (const r of rows) map[r.medicineId] = (map[r.medicineId] ?? 0) + r.quantity;
+    return map;
+  };
+
+  const importBeforeMap = sum(importsBefore);
+  const exportBeforeMap = sum(exportsBefore);
+  const importThisMap   = sum(importsThis);
+  const exportThisMap   = sum(exportsThis);
 
   const rows: MonthlyReportRow[] = allMedicines.map((med) => {
     const price = med.retailPrice ? parseFloat(med.retailPrice.toString()) : 0;
 
-    const openingStock = Math.max(
-      0,
-      (importBeforeMap[med.id] ?? 0) - (exportBeforeMap[med.id] ?? 0)
-    );
-    const importQty   = importThisMap[med.id] ?? 0;
-    const exportQty   = exportThisMap[med.id] ?? 0;
-    const totalQty    = openingStock + importQty;
-    const closingStock = Math.max(0, totalQty - exportQty);
+    const openingStock  = Math.max(0, (importBeforeMap[med.id] ?? 0) - (exportBeforeMap[med.id] ?? 0));
+    const importQty     = importThisMap[med.id] ?? 0;
+    const exportQty     = exportThisMap[med.id] ?? 0;
+    const totalQty      = openingStock + importQty;
+    const closingStock  = Math.max(0, totalQty - exportQty);
 
     return {
-      medicineId:    med.id,
-      name:          med.name,
-      unit:          med.unit,
-      retailPrice:   med.retailPrice?.toString() ?? null,
+      medicineId:   med.id,
+      name:         med.name,
+      unit:         med.unit,
+      retailPrice:  med.retailPrice?.toString() ?? null,
       openingStock,
-      openingValue:  openingStock * price,
+      openingValue: openingStock * price,
       importQty,
-      importValue:   importQty * price,
+      importValue:  importQty * price,
       totalQty,
-      totalValue:    totalQty * price,
+      totalValue:   totalQty * price,
       exportQty,
-      exportValue:   exportQty * price,
+      exportValue:  exportQty * price,
       closingStock,
-      closingValue:  closingStock * price,
+      closingValue: closingStock * price,
     };
   });
 
-  return rows;
+  // Only return rows with any activity
+  return rows.filter(r =>
+    r.openingStock > 0 || r.importQty > 0 || r.exportQty > 0 || r.closingStock > 0
+  );
 }

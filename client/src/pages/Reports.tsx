@@ -35,10 +35,8 @@ export default function Reports() {
     { enabled: true }
   );
 
-  // Only show rows that have any activity or stock
-  const activeRows = (rows ?? []).filter(
-    r => r.openingStock > 0 || r.importQty > 0 || r.exportQty > 0 || r.closingStock > 0
-  );
+  // Server already filters out zero-activity rows
+  const activeRows = rows ?? [];
 
   // Totals
   const totals = activeRows.reduce(
