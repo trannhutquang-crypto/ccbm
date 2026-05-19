@@ -250,9 +250,17 @@ export const appRouter = router({
         totalExportedThisMonth,
       };
     }),
-  }),
 
-  // ============= TRANSACTION HISTORY ROUTER =============
+    // Monthly NXT report — matches Bao_cao_NXT_Mau_Chuan format
+    monthly: protectedProcedure
+      .input(z.object({
+        month: z.number().int().min(1).max(12),
+        year: z.number().int().min(2000).max(2100),
+      }))
+      .query(async ({ input }) => {
+        return await db.getMonthlyReport(input.month, input.year);
+      }),
+  }),
   history: router({
     // Get transaction history with filters
     list: protectedProcedure

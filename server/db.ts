@@ -418,3 +418,133 @@ export async function getTotalExportedThisMonth() {
   
   return result.reduce((sum, rec) => sum + rec.quantity, 0);
 }
+
+// ============= MONTHLY NXT REPORT =============
+
+export type MonthlyReportRow = {
+  medicineId: number;
+  name: string;
+  unit: string;
+  retailPrice: string | null;
+  openingStock: number;       // Tồn đầu kỳ
+  openingValue: number;
+  importQty: number;          // Nhập trong kỳ
+  importValue: number;
+  totalQty: number;           // Tổng cộng
+  totalValue: number;
+  exportQty: number;          // Xuất trong kỳ
+  exportValue: number;
+  closingStock: number;       // Tồn cuối kỳ
+  closingValue: number;
+};
+
+export async function getMonthlyReport(
+  month: number,
+  year: number
+): Promise<MonthlyReportRow[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Period boundaries
+  const periodStart = new Date(year, month - 1, 1);
+  const periodEnd   = new Date(year, month, 1); // exclusive
+
+  // Previous period end = day before periodStart
+  const prevEnd = new Date(periodStart.getTime() - 1);
+
+  // Fetch all medicines
+  const allMedicines = await db.select().from(medicines).orderBy(medicines.name);
+
+  // Fetch all imports in period
+  const importsInPeriod = await db
+    .select()
+    .from(importRecords)
+    .where(
+      and(
+        gte(importRecords.importDate, periodStart),
+        lte(importRecords.importDate, prevEnd.getTime() < periodStart.getTime() ? periodEnd : periodEnd)
+      )
+    );
+
+  // Re-fetch with correct date range
+  const importsThisMonth = await db
+    .select()
+    .from(importRecords)
+    .where(
+      and(
+        gte(importRecords.importDate, periodStart),
+        lte(importRecords.importDate, new Date(year, month - 1, 31, 23, 59, 59))
+      )
+    );
+
+  const exportsThisMonth = await db
+    .select()
+    .from(exportRecords)
+    .where(
+      and(
+        gte(exportRecords.exportDate, periodStart),
+        lte(exportRecords.exportDate, new Date(year, month - 1, 31, 23, 59, 59))
+      )
+    );
+
+  // Fetch ALL imports/exports before this period to compute opening stock
+  const importsBefore = await db
+    .select()
+    .from(importRecords)
+    .where(lte(importRecords.importDate, new Date(year, month - 1, 0, 23, 59, 59)));
+
+  const exportsBefore = await db
+    .select()
+    .from(exportRecords)
+    .where(lte(exportRecords.exportDate, new Date(year, month - 1, 0, 23, 59, 59)));
+
+  // Build lookup maps
+  const importBeforeMap: Record<number, number> = {};
+  for (const r of importsBefore) {
+    importBeforeMap[r.medicineId] = (importBeforeMap[r.medicineId] ?? 0) + r.quantity;
+  }
+  const exportBeforeMap: Record<number, number> = {};
+  for (const r of exportsBefore) {
+    exportBeforeMap[r.medicineId] = (exportBeforeMap[r.medicineId] ?? 0) + r.quantity;
+  }
+  const importThisMap: Record<number, number> = {};
+  for (const r of importsThisMonth) {
+    importThisMap[r.medicineId] = (importThisMap[r.medicineId] ?? 0) + r.quantity;
+  }
+  const exportThisMap: Record<number, number> = {};
+  for (const r of exportsThisMonth) {
+    exportThisMap[r.medicineId] = (exportThisMap[r.medicineId] ?? 0) + r.quantity;
+  }
+
+  const rows: MonthlyReportRow[] = allMedicines.map((med) => {
+    const price = med.retailPrice ? parseFloat(med.retailPrice.toString()) : 0;
+
+    const openingStock = Math.max(
+      0,
+      (importBeforeMap[med.id] ?? 0) - (exportBeforeMap[med.id] ?? 0)
+    );
+    const importQty   = importThisMap[med.id] ?? 0;
+    const exportQty   = exportThisMap[med.id] ?? 0;
+    const totalQty    = openingStock + importQty;
+    const closingStock = Math.max(0, totalQty - exportQty);
+
+    return {
+      medicineId:    med.id,
+      name:          med.name,
+      unit:          med.unit,
+      retailPrice:   med.retailPrice?.toString() ?? null,
+      openingStock,
+      openingValue:  openingStock * price,
+      importQty,
+      importValue:   importQty * price,
+      totalQty,
+      totalValue:    totalQty * price,
+      exportQty,
+      exportValue:   exportQty * price,
+      closingStock,
+      closingValue:  closingStock * price,
+    };
+  });
+
+  return rows;
+}
