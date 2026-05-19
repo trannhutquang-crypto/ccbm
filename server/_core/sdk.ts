@@ -48,17 +48,35 @@ class SDKServer {
       return null;
     }
 
-    // Ensure admin user exists in DB
-    await db.upsertUser({
+    // Ensure admin user exists in DB — if DB is unavailable, create a synthetic user
+    try {
+      await db.upsertUser({
+        openId: ADMIN_OPEN_ID,
+        name: "Admin",
+        email: null,
+        loginMethod: "password",
+        role: "admin",
+        lastSignedIn: new Date(),
+      });
+
+      const user = await db.getUserByOpenId(ADMIN_OPEN_ID);
+      if (user) return user;
+    } catch (err) {
+      console.warn("[Auth] DB unavailable, using synthetic admin user:", err);
+    }
+
+    // Fallback: return a synthetic admin user so login still works without DB
+    return {
+      id: 0,
       openId: ADMIN_OPEN_ID,
       name: "Admin",
       email: null,
       loginMethod: "password",
       role: "admin",
+      createdAt: new Date(),
+      updatedAt: new Date(),
       lastSignedIn: new Date(),
-    });
-
-    return db.getUserByOpenId(ADMIN_OPEN_ID) as Promise<User>;
+    } as User;
   }
 
   async createSessionToken(
@@ -111,12 +129,30 @@ class SDKServer {
       throw ForbiddenError("Invalid session cookie");
     }
 
-    const user = await db.getUserByOpenId(session.openId);
-    if (!user) {
-      throw ForbiddenError("User not found");
+    // Try DB first
+    try {
+      const user = await db.getUserByOpenId(session.openId);
+      if (user) return user;
+    } catch (err) {
+      console.warn("[Auth] DB unavailable during auth, using session data:", err);
     }
 
-    return user;
+    // Fallback: reconstruct user from JWT payload (works when DB is down)
+    if (session.openId === ADMIN_OPEN_ID) {
+      return {
+        id: 0,
+        openId: ADMIN_OPEN_ID,
+        name: session.name || "Admin",
+        email: null,
+        loginMethod: "password",
+        role: "admin",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      } as User;
+    }
+
+    throw ForbiddenError("User not found");
   }
 }
 
