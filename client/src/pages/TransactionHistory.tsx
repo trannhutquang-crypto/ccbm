@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search } from "lucide-react";
 import { EmptyHistoryState } from "./EmptyStates";
 
 export default function TransactionHistory() {
@@ -17,6 +16,8 @@ export default function TransactionHistory() {
     type: "" as "" | "import" | "export",
   });
 
+  const { data: medicines } = trpc.medicines.list.useQuery();
+
   const { data: history, isLoading } = trpc.history.list.useQuery({
     medicineId: filters.medicineId ? parseInt(filters.medicineId) : undefined,
     exportedBy: filters.exportedBy || undefined,
@@ -25,14 +26,11 @@ export default function TransactionHistory() {
     type: filters.type || undefined,
   });
 
+  // Lookup map: medicineId → name
+  const medicineMap = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
+
   const handleReset = () => {
-    setFilters({
-      medicineId: "",
-      exportedBy: "",
-      startDate: "",
-      endDate: "",
-      type: "",
-    });
+    setFilters({ medicineId: "", exportedBy: "", startDate: "", endDate: "", type: "" });
   };
 
   const hasData = (history?.imports?.length || 0) + (history?.exports?.length || 0) > 0;
@@ -56,14 +54,18 @@ export default function TransactionHistory() {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
-              <Label htmlFor="medicineId">ID Thuốc</Label>
-              <Input
-                id="medicineId"
-                type="number"
+              <Label htmlFor="medicineFilter">Tên thuốc</Label>
+              <select
+                id="medicineFilter"
                 value={filters.medicineId}
                 onChange={(e) => setFilters({ ...filters, medicineId: e.target.value })}
-                placeholder="Nhập ID"
-              />
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm"
+              >
+                <option value="">Tất cả thuốc</option>
+                {medicines?.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label htmlFor="exportedBy">Người xuất</Label>
@@ -98,7 +100,7 @@ export default function TransactionHistory() {
                 id="type"
                 value={filters.type}
                 onChange={(e) => setFilters({ ...filters, type: e.target.value as any })}
-                className="w-full px-3 py-2 border border-border rounded-md"
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm"
               >
                 <option value="">Tất cả</option>
                 <option value="import">Nhập kho</option>
@@ -107,9 +109,7 @@ export default function TransactionHistory() {
             </div>
           </div>
           <div className="flex gap-2 mt-4">
-            <Button variant="outline" onClick={handleReset}>
-              Đặt lại
-            </Button>
+            <Button variant="outline" onClick={handleReset}>Đặt lại</Button>
           </div>
         </CardContent>
       </Card>
@@ -118,7 +118,9 @@ export default function TransactionHistory() {
       <Card>
         <CardHeader>
           <CardTitle>Lịch sử</CardTitle>
-          <CardDescription>Danh sách nhập/xuất kho</CardDescription>
+          <CardDescription>
+            {(history?.imports?.length || 0) + (history?.exports?.length || 0)} giao dịch
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -126,9 +128,9 @@ export default function TransactionHistory() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Loại</TableHead>
-                  <TableHead>Thuốc</TableHead>
+                  <TableHead>Tên thuốc</TableHead>
                   <TableHead>Số lượng</TableHead>
-                  <TableHead className="hidden sm:table-cell">Nhà cung cấp/Người xuất</TableHead>
+                  <TableHead className="hidden sm:table-cell">Nhà cung cấp / Người xuất</TableHead>
                   <TableHead>Ngày</TableHead>
                 </TableRow>
               </TableHeader>
@@ -143,8 +145,12 @@ export default function TransactionHistory() {
                   <>
                     {history?.imports?.map((imp) => (
                       <TableRow key={`import-${imp.id}`}>
-                        <TableCell><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Nhập</span></TableCell>
-                        <TableCell>ID: {imp.medicineId}</TableCell>
+                        <TableCell>
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">Nhập</span>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {medicineMap[imp.medicineId] ?? `ID: ${imp.medicineId}`}
+                        </TableCell>
                         <TableCell>{imp.quantity}</TableCell>
                         <TableCell className="hidden sm:table-cell">{imp.supplier}</TableCell>
                         <TableCell>{imp.importDate?.toString().split("T")[0]}</TableCell>
@@ -152,8 +158,12 @@ export default function TransactionHistory() {
                     ))}
                     {history?.exports?.map((exp) => (
                       <TableRow key={`export-${exp.id}`}>
-                        <TableCell><span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">Xuất</span></TableCell>
-                        <TableCell>ID: {exp.medicineId}</TableCell>
+                        <TableCell>
+                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">Xuất</span>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {medicineMap[exp.medicineId] ?? `ID: ${exp.medicineId}`}
+                        </TableCell>
                         <TableCell>{exp.quantity}</TableCell>
                         <TableCell className="hidden sm:table-cell">{exp.exportedBy}</TableCell>
                         <TableCell>{exp.exportDate?.toString().split("T")[0]}</TableCell>

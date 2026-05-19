@@ -27,6 +27,9 @@ export default function ExportManagement() {
   const { data: exports, isLoading, refetch } = trpc.exports.list.useQuery({ limit: 50 });
   const createMutation = trpc.exports.create.useMutation();
 
+  // Lookup map: medicineId → name
+  const medicineMap = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
+
   const handleAddItem = () => {
     if (items.length < 10) {
       setItems([...items, { medicineId: 0, quantity: 0, unitPrice: "" }]);
@@ -262,7 +265,9 @@ export default function ExportManagement() {
                 ) : (
                   exports.map((exp) => (
                     <TableRow key={exp.id}>
-                      <TableCell className="font-medium">ID: {exp.medicineId}</TableCell>
+                      <TableCell className="font-medium">
+                        {medicineMap[exp.medicineId] ?? `ID: ${exp.medicineId}`}
+                      </TableCell>
                       <TableCell>{exp.quantity}</TableCell>
                       <TableCell className="hidden sm:table-cell">{exp.exportedBy}</TableCell>
                       <TableCell className="hidden md:table-cell">{exp.reason}</TableCell>

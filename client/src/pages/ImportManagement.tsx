@@ -28,6 +28,9 @@ export default function ImportManagement() {
   const { data: imports, isLoading, refetch } = trpc.imports.list.useQuery({ limit: 50 });
   const createMutation = trpc.imports.create.useMutation();
 
+  // Lookup map: medicineId → name
+  const medicineMap = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -41,15 +44,7 @@ export default function ImportManagement() {
         notes: formData.notes || undefined,
       });
       toast.success("Phiếu nhập đã được tạo thành công");
-      setFormData({
-        medicineId: 0,
-        quantity: 0,
-        supplier: "",
-        batchNumber: "",
-        expiryDate: "",
-        importDate: "",
-        notes: "",
-      });
+      setFormData({ medicineId: 0, quantity: 0, supplier: "", batchNumber: "", expiryDate: "", importDate: "", notes: "" });
       setIsOpen(false);
       refetch();
     } catch (error) {
@@ -81,71 +76,51 @@ export default function ImportManagement() {
                 <DialogTitle>Tạo phiếu nhập kho</DialogTitle>
                 <DialogDescription>Ghi nhận nhập thuốc vào kho</DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-3 max-h-96 overflow-y-auto">
+              <form onSubmit={handleCreate} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
                 <div>
                   <Label htmlFor="medicineId">Thuốc</Label>
                   <select
                     id="medicineId"
                     value={formData.medicineId}
                     onChange={(e) => setFormData({ ...formData, medicineId: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-border rounded-md"
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
                     required
                   >
                     <option value="">Chọn thuốc</option>
                     {medicines?.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
+                      <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <Label htmlFor="quantity">Số lượng</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
-                    min="1"
-                    required
-                  />
+                  <Input id="quantity" type="number" value={formData.quantity}
+                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })} min="1" required />
                 </div>
                 <div>
                   <Label htmlFor="supplier">Nhà cung cấp</Label>
-                  <Input
-                    id="supplier"
-                    value={formData.supplier}
-                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                    required
-                  />
+                  <Input id="supplier" value={formData.supplier}
+                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })} required />
                 </div>
                 <div>
                   <Label htmlFor="batchNumber">Số lô</Label>
-                  <Input
-                    id="batchNumber"
-                    value={formData.batchNumber}
-                    onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
-                  />
+                  <Input id="batchNumber" value={formData.batchNumber}
+                    onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="expiryDate">Hạn sử dụng</Label>
-                  <Input
-                    id="expiryDate"
-                    type="date"
-                    value={formData.expiryDate}
-                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    required
-                  />
+                  <Input id="expiryDate" type="date" value={formData.expiryDate}
+                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })} required />
                 </div>
                 <div>
                   <Label htmlFor="importDate">Ngày nhập</Label>
-                  <Input
-                    id="importDate"
-                    type="date"
-                    value={formData.importDate}
-                    onChange={(e) => setFormData({ ...formData, importDate: e.target.value })}
-                    required
-                  />
+                  <Input id="importDate" type="date" value={formData.importDate}
+                    onChange={(e) => setFormData({ ...formData, importDate: e.target.value })} required />
+                </div>
+                <div>
+                  <Label htmlFor="notes">Ghi chú</Label>
+                  <Input id="notes" value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
                 </div>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending}>
                   {createMutation.isPending ? "Đang tạo..." : "Tạo phiếu nhập"}
@@ -166,7 +141,7 @@ export default function ImportManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Thuốc</TableHead>
+                  <TableHead>Tên thuốc</TableHead>
                   <TableHead>Số lượng</TableHead>
                   <TableHead className="hidden sm:table-cell">Nhà cung cấp</TableHead>
                   <TableHead className="hidden md:table-cell">Số lô</TableHead>
@@ -184,7 +159,9 @@ export default function ImportManagement() {
                 ) : (
                   imports.map((imp) => (
                     <TableRow key={imp.id}>
-                      <TableCell className="font-medium">ID: {imp.medicineId}</TableCell>
+                      <TableCell className="font-medium">
+                        {medicineMap[imp.medicineId] ?? `ID: ${imp.medicineId}`}
+                      </TableCell>
                       <TableCell>{imp.quantity}</TableCell>
                       <TableCell className="hidden sm:table-cell">{imp.supplier}</TableCell>
                       <TableCell className="hidden md:table-cell">{imp.batchNumber || "-"}</TableCell>
