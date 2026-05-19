@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyExportState } from "./EmptyStates";
+
+const REASON_LABELS: Record<string, string> = {
+  emergency_use: "Sử dụng cấp cứu",
+  expired:       "Hết hạn",
+  damaged:       "Hỏng",
+  other:         "Khác",
+};
+
+type ExportItem = { medicineId: number; quantity: number; unitPrice: string };
 
 export default function ExportManagement() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [items, setItems] = useState<Array<{ medicineId: number; quantity: number; unitPrice: string }>>([]);
+  const [items, setItems] = useState<ExportItem[]>([]);
   const [formData, setFormData] = useState({
     exportedBy: "",
     reason: "emergency_use" as const,
@@ -27,54 +36,67 @@ export default function ExportManagement() {
   const { data: exports, isLoading, refetch } = trpc.exports.list.useQuery({ limit: 50 });
   const createMutation = trpc.exports.create.useMutation();
 
-  // Lookup map: medicineId → name
-  const medicineMap = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
+  // Lookup maps
+  const medicineMap    = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
+  const retailPriceMap = Object.fromEntries(
+    (medicines ?? []).map(m => [m.id, m.retailPrice ? m.retailPrice.toString() : ""])
+  );
 
-  const handleAddItem = () => {
-    if (items.length < 10) {
-      setItems([...items, { medicineId: 0, quantity: 0, unitPrice: "" }]);
-    } else {
-      toast.error("Tối đa 10 loại thuốc mỗi phiếu");
-    }
+  // Auto-recalculate totalPrice whenever items change
+  useEffect(() => {
+    const total = items.reduce((sum, item) => {
+      const price = parseFloat(item.unitPrice) || 0;
+      const qty   = item.quantity || 0;
+      return sum + price * qty;
+    }, 0);
+    setFormData(prev => ({ ...prev, totalPrice: total > 0 ? total.toString() : "" }));
+  }, [items]);
+
+  const handleMedicineChange = (idx: number, medicineId: number) => {
+    const newItems = [...items];
+    newItems[idx] = {
+      ...newItems[idx],
+      medicineId,
+      // Auto-fill unit price from retailPrice
+      unitPrice: retailPriceMap[medicineId] ?? "",
+    };
+    setItems(newItems);
   };
 
-  const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  const handleAddItem = () => {
+    if (items.length >= 10) { toast.error("Tối đa 10 loại thuốc mỗi phiếu"); return; }
+    setItems([...items, { medicineId: 0, quantity: 1, unitPrice: "" }]);
+  };
+
+  const handleRemoveItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+
+  const resetForm = () => {
+    setItems([]);
+    setFormData({ exportedBy: "", reason: "emergency_use", totalPrice: "", exportDate: "", notes: "" });
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) {
-      toast.error("Vui lòng thêm ít nhất 1 loại thuốc");
-      return;
-    }
-
+    if (items.length === 0) { toast.error("Vui lòng thêm ít nhất 1 loại thuốc"); return; }
     try {
       await createMutation.mutateAsync({
         items: items.map(item => ({
           medicineId: item.medicineId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice || undefined,
+          quantity:   item.quantity,
+          unitPrice:  item.unitPrice || undefined,
         })),
         exportedBy: formData.exportedBy,
-        reason: formData.reason,
+        reason:     formData.reason,
         totalPrice: formData.totalPrice || undefined,
         exportDate: new Date(formData.exportDate),
-        notes: formData.notes || undefined,
+        notes:      formData.notes || undefined,
       });
       toast.success("Phiếu xuất đã được tạo thành công");
-      setItems([]);
-      setFormData({
-        exportedBy: "",
-        reason: "emergency_use",
-        totalPrice: "",
-        exportDate: "",
-        notes: "",
-      });
+      resetForm();
       setIsOpen(false);
       refetch();
-    } catch (error) {
-      toast.error("Lỗi khi tạo phiếu xuất");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Lỗi khi tạo phiếu xuất");
     }
   };
 
@@ -89,7 +111,7 @@ export default function ExportManagement() {
           <h1 className="text-3xl font-bold tracking-tight">Quản lý xuất kho</h1>
           <p className="text-muted-foreground mt-2">Quản lý phiếu xuất thuốc (tối đa 10 loại/phiếu)</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsOpen(open); }}>
           <DialogTrigger asChild>
             <Button className="gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
@@ -101,25 +123,19 @@ export default function ExportManagement() {
               <DialogTitle>Tạo phiếu xuất kho</DialogTitle>
               <DialogDescription>Ghi nhận xuất thuốc từ kho (tối đa 10 loại)</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 max-h-96 overflow-y-auto">
+            <form onSubmit={handleCreate} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="exportedBy">Người xuất</Label>
-                  <Input
-                    id="exportedBy"
-                    value={formData.exportedBy}
-                    onChange={(e) => setFormData({ ...formData, exportedBy: e.target.value })}
-                    required
-                  />
+                  <Input id="exportedBy" value={formData.exportedBy}
+                    onChange={(e) => setFormData({ ...formData, exportedBy: e.target.value })} required />
                 </div>
                 <div>
                   <Label htmlFor="reason">Lý do xuất</Label>
-                  <select
-                    id="reason"
-                    value={formData.reason}
+                  <select id="reason" value={formData.reason}
                     onChange={(e) => setFormData({ ...formData, reason: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-border rounded-md"
-                  >
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background">
                     <option value="emergency_use">Sử dụng cấp cứu</option>
                     <option value="expired">Hết hạn</option>
                     <option value="damaged">Hỏng</option>
@@ -128,105 +144,94 @@ export default function ExportManagement() {
                 </div>
               </div>
 
+              {/* Items */}
               <div>
-                <Label>Danh sách thuốc xuất ({items.length}/10)</Label>
-                <div className="space-y-2 mt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Danh sách thuốc xuất ({items.length}/10)</Label>
+                </div>
+
+                {items.length > 0 && (
+                  <div className="grid grid-cols-[1fr_60px_100px_36px] gap-1 mb-1 px-1">
+                    <span className="text-xs text-muted-foreground">Tên thuốc</span>
+                    <span className="text-xs text-muted-foreground text-center">SL</span>
+                    <span className="text-xs text-muted-foreground text-right">Đơn giá (đ)</span>
+                    <span />
+                  </div>
+                )}
+
+                <div className="space-y-2">
                   {items.map((item, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row gap-2 items-end">
+                    <div key={idx} className="grid grid-cols-[1fr_60px_100px_36px] gap-1 items-center">
                       <select
-                        value={item.medicineId}
-                        onChange={(e) => {
-                          const newItems = [...items];
-                          newItems[idx].medicineId = parseInt(e.target.value);
-                          setItems(newItems);
-                        }}
-                        className="flex-1 px-3 py-2 border border-border rounded-md text-sm"
+                        value={item.medicineId || ""}
+                        onChange={(e) => handleMedicineChange(idx, parseInt(e.target.value))}
+                        className="px-2 py-2 border border-border rounded-md text-sm bg-background"
                         required
                       >
                         <option value="">Chọn thuốc</option>
                         {medicines?.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
+                          <option key={m.id} value={m.id}>{m.name}</option>
                         ))}
                       </select>
+
                       <Input
                         type="number"
-                        placeholder="SL"
                         value={item.quantity}
                         onChange={(e) => {
                           const newItems = [...items];
-                          newItems[idx].quantity = parseInt(e.target.value);
+                          newItems[idx].quantity = parseInt(e.target.value) || 0;
                           setItems(newItems);
                         }}
-                        className="w-full sm:w-20"
+                        className="text-center px-1"
                         min="1"
                         required
                       />
+
                       <Input
                         type="number"
-                        placeholder="Giá"
                         value={item.unitPrice}
                         onChange={(e) => {
                           const newItems = [...items];
                           newItems[idx].unitPrice = e.target.value;
                           setItems(newItems);
                         }}
-                        className="w-full sm:w-24"
+                        className="text-right px-2"
+                        placeholder="0"
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveItem(idx)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
+
+                      <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0"
+                        onClick={() => handleRemoveItem(idx)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
                   ))}
                 </div>
-                {items.length < 10 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full mt-2"
-                    onClick={handleAddItem}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Thêm thuốc
-                  </Button>
-                )}
+
+                <Button type="button" variant="outline" className="w-full mt-2" onClick={handleAddItem}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Thêm thuốc
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="totalPrice">Tổng giá bán</Label>
-                  <Input
-                    id="totalPrice"
-                    type="number"
-                    value={formData.totalPrice}
-                    onChange={(e) => setFormData({ ...formData, totalPrice: e.target.value })}
+                  <Label htmlFor="totalPrice">Tổng tiền (tự tính)</Label>
+                  <Input id="totalPrice" type="number" value={formData.totalPrice} readOnly
+                    className="bg-muted cursor-default"
+                    placeholder="Tự động tính"
                   />
                 </div>
                 <div>
                   <Label htmlFor="exportDate">Ngày xuất</Label>
-                  <Input
-                    id="exportDate"
-                    type="date"
-                    value={formData.exportDate}
-                    onChange={(e) => setFormData({ ...formData, exportDate: e.target.value })}
-                    required
-                  />
+                  <Input id="exportDate" type="date" value={formData.exportDate}
+                    onChange={(e) => setFormData({ ...formData, exportDate: e.target.value })} required />
                 </div>
               </div>
 
               <div>
                 <Label htmlFor="notes">Ghi chú</Label>
-                <Input
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                />
+                <Input id="notes" value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
               </div>
 
               <Button type="submit" className="w-full" disabled={createMutation.isPending}>
@@ -237,6 +242,7 @@ export default function ExportManagement() {
         </Dialog>
       </div>
 
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle>Danh sách phiếu xuất</CardTitle>
@@ -247,11 +253,11 @@ export default function ExportManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Thuốc</TableHead>
+                  <TableHead>Tên thuốc</TableHead>
                   <TableHead>Số lượng</TableHead>
                   <TableHead className="hidden sm:table-cell">Người xuất</TableHead>
                   <TableHead className="hidden md:table-cell">Lý do</TableHead>
-                  <TableHead className="hidden lg:table-cell">Tổng giá</TableHead>
+                  <TableHead className="hidden lg:table-cell">Tổng tiền</TableHead>
                   <TableHead>Ngày xuất</TableHead>
                 </TableRow>
               </TableHeader>
@@ -270,8 +276,14 @@ export default function ExportManagement() {
                       </TableCell>
                       <TableCell>{exp.quantity}</TableCell>
                       <TableCell className="hidden sm:table-cell">{exp.exportedBy}</TableCell>
-                      <TableCell className="hidden md:table-cell">{exp.reason}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{exp.totalPrice || "-"}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {REASON_LABELS[exp.reason] ?? exp.reason}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {exp.totalPrice
+                          ? `${parseFloat(exp.totalPrice).toLocaleString("vi-VN")} đ`
+                          : "-"}
+                      </TableCell>
                       <TableCell>{exp.exportDate?.toString().split("T")[0]}</TableCell>
                     </TableRow>
                   ))
