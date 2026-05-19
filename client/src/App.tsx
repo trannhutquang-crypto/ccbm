@@ -33,12 +33,12 @@ function ProtectedRoutes() {
   return (
     <DashboardLayout>
       <Switch>
-        <Route path={"/"} component={Dashboard} />
-        <Route path={"/medicines"} component={MedicineManagement} />
-        <Route path={"/imports"} component={ImportManagement} />
-        <Route path={"/exports"} component={ExportManagement} />
-        <Route path={"/history"} component={TransactionHistory} />
-        <Route path={"/reports"} component={Reports} />
+        <Route path="/" component={Dashboard} />
+        <Route path="/medicines" component={MedicineManagement} />
+        <Route path="/imports" component={ImportManagement} />
+        <Route path="/exports" component={ExportManagement} />
+        <Route path="/history" component={TransactionHistory} />
+        <Route path="/reports" component={Reports} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -50,9 +50,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/404" component={NotFound} />
-      <Route nest>
-        {() => <ProtectedRoutes />}
-      </Route>
+      <Route component={ProtectedRoutes} />
     </Switch>
   );
 }

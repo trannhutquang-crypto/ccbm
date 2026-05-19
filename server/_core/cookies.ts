@@ -28,9 +28,8 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    // "lax" works for same-site requests (frontend + backend on same domain).
-    // "none" requires secure:true which can fail if proxy headers are missing.
-    sameSite: secure ? "lax" : "lax",
+    sameSite: "lax",
+    // Only set Secure flag on HTTPS — avoids browser rejecting cookie on HTTP dev
     secure,
   };
 }
