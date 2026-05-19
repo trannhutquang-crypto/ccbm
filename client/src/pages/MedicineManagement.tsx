@@ -7,9 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, AlertTriangle, X } from "lucide-react";
+import { Plus, Edit2, Trash2, AlertTriangle, X, CalendarX } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyMedicineState } from "./EmptyStates";
+
+function getExpiryStatus(expiryDate: string | Date | null): "expired" | "critical" | "warning" | "ok" {
+  if (!expiryDate) return "ok";
+  const days = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days <= 0)  return "expired";
+  if (days <= 7)  return "critical";
+  if (days <= 30) return "warning";
+  return "ok";
+}
+
+function daysUntil(expiryDate: string | Date | null): number | null {
+  if (!expiryDate) return null;
+  return Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
 
 export default function MedicineManagement() {
   const { user } = useAuth();
@@ -93,8 +107,15 @@ export default function MedicineManagement() {
     }
   };
 
-  const isLowStock = (medicineId: number) => {
-    return lowStockMedicines?.some(m => m.id === medicineId);
+  const isLowStock = (medicineId: number) => lowStockMedicines?.some(m => m.id === medicineId);
+
+  // Row highlight class based on expiry + stock status
+  const getRowClass = (medicine: any) => {
+    const expiry = getExpiryStatus(medicine.expiryDate);
+    if (expiry === "expired")  return "bg-red-50 dark:bg-red-950/20";
+    if (expiry === "critical") return "bg-red-50/60 dark:bg-red-950/10";
+    if (expiry === "warning")  return "bg-orange-50/60 dark:bg-orange-950/10";
+    return "";
   };
 
   if (isLoading) {
@@ -242,22 +263,59 @@ export default function MedicineManagement() {
                   </TableRow>
                 ) : (
                   medicines.map((medicine) => (
-                    <TableRow key={medicine.id}>
+                    <TableRow key={medicine.id} className={getRowClass(medicine)}>
                       <TableCell className="font-medium">{medicine.name}</TableCell>
                       <TableCell>{medicine.unit}</TableCell>
                       <TableCell>{medicine.currentStock}</TableCell>
                       <TableCell className="hidden sm:table-cell">{medicine.minimumStock}</TableCell>
                       <TableCell className="hidden md:table-cell">{medicine.retailPrice ? `${parseFloat(medicine.retailPrice.toString()).toLocaleString('vi-VN')} đ` : '-'}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{medicine.expiryDate ? new Date(medicine.expiryDate).toLocaleDateString('vi-VN') : '-'}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {medicine.expiryDate ? (
+                          <span className={
+                            getExpiryStatus(medicine.expiryDate) === "expired"  ? "text-red-600 font-semibold" :
+                            getExpiryStatus(medicine.expiryDate) === "critical" ? "text-red-500 font-medium" :
+                            getExpiryStatus(medicine.expiryDate) === "warning"  ? "text-orange-500" : ""
+                          }>
+                            {new Date(medicine.expiryDate).toLocaleDateString('vi-VN')}
+                          </span>
+                        ) : '-'}
+                      </TableCell>
                       <TableCell>
-                        {isLowStock(medicine.id) ? (
-                          <div className="flex items-center gap-2 text-orange-600">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-sm">Dưới định mức</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-green-600">Bình thường</span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {/* Expiry status */}
+                          {(() => {
+                            const status = getExpiryStatus(medicine.expiryDate);
+                            const days   = daysUntil(medicine.expiryDate);
+                            if (status === "expired") return (
+                              <div className="flex items-center gap-1 text-red-600">
+                                <CalendarX className="h-3.5 w-3.5" />
+                                <span className="text-xs font-semibold">Đã hết hạn</span>
+                              </div>
+                            );
+                            if (status === "critical") return (
+                              <div className="flex items-center gap-1 text-red-500">
+                                <CalendarX className="h-3.5 w-3.5" />
+                                <span className="text-xs font-medium">Hết hạn sau {days} ngày</span>
+                              </div>
+                            );
+                            if (status === "warning") return (
+                              <div className="flex items-center gap-1 text-orange-500">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                <span className="text-xs">Còn {days} ngày</span>
+                              </div>
+                            );
+                            return null;
+                          })()}
+                          {/* Stock status */}
+                          {isLowStock(medicine.id) ? (
+                            <div className="flex items-center gap-1 text-yellow-600">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              <span className="text-xs">Dưới định mức</span>
+                            </div>
+                          ) : getExpiryStatus(medicine.expiryDate) === "ok" ? (
+                            <span className="text-xs text-green-600">Bình thường</span>
+                          ) : null}
+                        </div>
                       </TableCell>
                       {user?.role === "admin" && (
                         <TableCell>
