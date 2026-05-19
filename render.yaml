@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: hopnheem
+    runtime: node
+    region: singapore # Gần Việt Nam nhất
+    plan: free
+
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: node dist/index.js
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+
+      # --- Bắt buộc: set thủ công trên Render Dashboard ---
+      - key: DATABASE_URL
+        sync: false   # Render sẽ hỏi giá trị khi deploy
+
+      - key: JWT_SECRET
+        generateValue: true  # Render tự sinh random secret
+
+      - key: OAUTH_SERVER_URL
+        sync: false
+
+      - key: VITE_APP_ID
+        sync: false
+
+      - key: VITE_OAUTH_PORTAL_URL
+        sync: false
+
+      - key: OWNER_OPEN_ID
+        sync: false
+
+      # --- Tuỳ chọn ---
+      - key: BUILT_IN_FORGE_API_URL
+        sync: false
+      - key: BUILT_IN_FORGE_API_KEY
+        sync: false

@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1777781693937,
+      "tag": "0000_silly_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1777782080329,
+      "tag": "0001_strange_moon_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779087946862,
+      "tag": "0002_plain_randall_flagg",
+      "breakpoints": true
+    }
+  ]
+}

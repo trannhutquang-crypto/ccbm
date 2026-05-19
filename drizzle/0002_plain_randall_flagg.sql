@@ -1,0 +1,1 @@
+ALTER TABLE `medicines` ADD `retailPrice` decimal(12,2);
