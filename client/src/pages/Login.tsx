@@ -26,7 +26,11 @@ export default function Login() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Đăng nhập thất bại");
+        if (res.status === 401) {
+          setError("Tên đăng nhập hoặc mật khẩu không đúng");
+        } else {
+          setError(data.error ?? "Đăng nhập thất bại");
+        }
         return;
       }
 
