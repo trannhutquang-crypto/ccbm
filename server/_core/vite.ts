@@ -48,10 +48,9 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // esbuild bundles server/_core/index.ts → dist/index.js
-  // Vite builds frontend → dist/public/
-  // Both land in the same dist/ folder, so public is a sibling of index.js
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // process.cwd() on Render = /opt/render/project/src (the repo root)
+  // Vite builds frontend to dist/public relative to repo root
+  const distPath = path.resolve(process.cwd(), "dist", "public");
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
