@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -165,8 +166,8 @@ export default function ImportManagement() {
                       <TableCell>{imp.quantity}</TableCell>
                       <TableCell className="hidden sm:table-cell">{imp.supplier}</TableCell>
                       <TableCell className="hidden md:table-cell">{imp.batchNumber || "-"}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{imp.expiryDate?.toString().split("T")[0]}</TableCell>
-                      <TableCell>{imp.importDate?.toString().split("T")[0]}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{formatDate(imp.expiryDate)}</TableCell>
+                      <TableCell>{formatDate(imp.importDate)}</TableCell>
                     </TableRow>
                   ))
                 )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -153,7 +154,7 @@ export default function TransactionHistory() {
                         </TableCell>
                         <TableCell>{imp.quantity}</TableCell>
                         <TableCell className="hidden sm:table-cell">{imp.supplier}</TableCell>
-                        <TableCell>{imp.importDate?.toString().split("T")[0]}</TableCell>
+                        <TableCell>{formatDate(imp.importDate)}</TableCell>
                       </TableRow>
                     ))}
                     {history?.exports?.map((exp) => (
@@ -166,7 +167,7 @@ export default function TransactionHistory() {
                         </TableCell>
                         <TableCell>{exp.quantity}</TableCell>
                         <TableCell className="hidden sm:table-cell">{exp.exportedBy}</TableCell>
-                        <TableCell>{exp.exportDate?.toString().split("T")[0]}</TableCell>
+                        <TableCell>{formatDate(exp.exportDate)}</TableCell>
                       </TableRow>
                     ))}
                   </>

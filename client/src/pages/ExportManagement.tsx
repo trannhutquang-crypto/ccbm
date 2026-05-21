@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -284,7 +285,7 @@ export default function ExportManagement() {
                           ? `${parseFloat(exp.totalPrice).toLocaleString("vi-VN")} đ`
                           : "-"}
                       </TableCell>
-                      <TableCell>{exp.exportDate?.toString().split("T")[0]}</TableCell>
+                      <TableCell>{formatDate(exp.exportDate)}</TableCell>
                     </TableRow>
                   ))
                 )}
