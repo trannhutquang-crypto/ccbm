@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,16 @@ export default function TransactionHistory() {
 
   // Lookup map: medicineId → name
   const medicineMap = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
+
+  const exporterNames = useMemo(() => {
+    const names = new Set<string>();
+    history?.exports?.forEach((exp) => {
+      if (exp.exportedBy) {
+        names.add(exp.exportedBy);
+      }
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [history?.exports]);
 
   const handleReset = () => {
     setFilters({ medicineId: "", exportedBy: "", startDate: "", endDate: "", type: "" });
@@ -70,12 +80,17 @@ export default function TransactionHistory() {
             </div>
             <div>
               <Label htmlFor="exportedBy">Người xuất</Label>
-              <Input
+              <select
                 id="exportedBy"
                 value={filters.exportedBy}
                 onChange={(e) => setFilters({ ...filters, exportedBy: e.target.value })}
-                placeholder="Tên người xuất"
-              />
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm"
+              >
+                <option value="">Tất cả người xuất</option>
+                {exporterNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label htmlFor="startDate">Từ ngày</Label>
