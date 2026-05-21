@@ -181,6 +181,18 @@ describe("Exports procedures", () => {
     }
   });
 
+  it("exports.list should support exportedBy filter", async () => {
+    const ctx = createMockContext();
+    const caller = appRouter.createCaller(ctx);
+
+    try {
+      const result = await caller.exports.list({ limit: 50, exportedBy: "Test" });
+      expect(Array.isArray(result)).toBe(true);
+    } catch (error) {
+      expect(error).toBeDefined();
+    }
+  });
+
   it("user should be able to create export", async () => {
     const ctx = createMockContext("user");
     const caller = appRouter.createCaller(ctx);

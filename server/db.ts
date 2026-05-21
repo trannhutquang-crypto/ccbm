@@ -265,11 +265,17 @@ export async function createExportItem(data: {
   return await db.insert(exportItems).values(data);
 }
 
-export async function getExportRecords(limit: number = 100, offset: number = 0) {
+export async function getExportRecords(limit: number = 100, offset: number = 0, exportedBy?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  return await db.select().from(exportRecords)
+  let query = db.select().from(exportRecords);
+
+  if (exportedBy) {
+    query = query.where(like(exportRecords.exportedBy, `%${exportedBy}%`)) as any;
+  }
+
+  return await query
     .orderBy(desc(exportRecords.exportDate))
     .limit(limit)
     .offset(offset);

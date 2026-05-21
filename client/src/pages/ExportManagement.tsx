@@ -34,7 +34,11 @@ export default function ExportManagement() {
   });
 
   const { data: medicines } = trpc.medicines.list.useQuery();
-  const { data: exports, isLoading, refetch } = trpc.exports.list.useQuery({ limit: 50 });
+  const [exportedByFilter, setExportedByFilter] = useState("");
+  const { data: exports, isLoading, refetch } = trpc.exports.list.useQuery({
+    limit: 50,
+    exportedBy: exportedByFilter || undefined,
+  });
   const createMutation = trpc.exports.create.useMutation();
 
   // Lookup maps
@@ -243,8 +247,30 @@ export default function ExportManagement() {
         </Dialog>
       </div>
 
-      {/* Table */}
       <Card>
+        <CardHeader>
+          <CardTitle>Bộ lọc</CardTitle>
+          <CardDescription>Giảm danh sách phiếu xuất theo tên người xuất</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+            <div>
+              <Label htmlFor="exportedByFilter">Người xuất</Label>
+              <Input
+                id="exportedByFilter"
+                value={exportedByFilter}
+                onChange={(e) => setExportedByFilter(e.target.value)}
+                placeholder="Lọc theo người xuất"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button variant="outline" className="w-full sm:w-auto" onClick={() => setExportedByFilter("")}>Xóa lọc</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
         <CardHeader>
           <CardTitle>Danh sách phiếu xuất</CardTitle>
           <CardDescription>Tổng cộng {exports?.length || 0} phiếu xuất</CardDescription>

@@ -151,10 +151,11 @@ export const appRouter = router({
         z.object({
           limit: z.number().int().min(1).max(100).default(50),
           offset: z.number().int().min(0).default(0),
+          exportedBy: z.string().optional(),
         })
       )
       .query(async ({ input }) => {
-        return await db.getExportRecords(input.limit, input.offset);
+        return await db.getExportRecords(input.limit, input.offset, input.exportedBy);
       }),
 
     // Get exports for specific medicine
