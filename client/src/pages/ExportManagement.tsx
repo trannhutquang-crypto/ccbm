@@ -271,6 +271,7 @@ export default function ExportManagement() {
       </Card>
 
       {/* Table */}
+      <Card>
         <CardHeader>
           <CardTitle>Danh sách phiếu xuất</CardTitle>
           <CardDescription>Tổng cộng {exports?.length || 0} phiếu xuất</CardDescription>
