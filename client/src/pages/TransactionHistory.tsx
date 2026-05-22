@@ -30,18 +30,25 @@ export default function TransactionHistory() {
     type: filters.type || undefined,
   });
 
+  const { data: exporterHistory } = trpc.history.list.useQuery({
+    medicineId: filters.medicineId ? parseInt(filters.medicineId) : undefined,
+    startDate: filters.startDate ? new Date(filters.startDate) : undefined,
+    endDate: filters.endDate ? new Date(filters.endDate) : undefined,
+    type: filters.type || undefined,
+  });
+
   // Lookup map: medicineId → name
   const medicineMap = Object.fromEntries((medicines ?? []).map(m => [m.id, m.name]));
 
   const exporterNames = useMemo(() => {
     const names = new Set<string>();
-    history?.exports?.forEach((exp) => {
+    exporterHistory?.exports?.forEach((exp) => {
       if (exp.exportedBy) {
         names.add(exp.exportedBy);
       }
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [history?.exports]);
+  }, [exporterHistory?.exports]);
 
   const handleReset = () => {
     setFilters({ medicineId: "", exportedBy: "", startDate: "", endDate: "", type: "" });
