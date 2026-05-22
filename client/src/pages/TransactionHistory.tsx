@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyHistoryState } from "./EmptyStates";
 
+const CLEAR_SELECTION = "__clear__";
+
 export default function TransactionHistory() {
   const [filters, setFilters] = useState({
     medicineId: "",
@@ -67,12 +69,15 @@ export default function TransactionHistory() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
               <Label htmlFor="medicineFilter">Tên thuốc</Label>
-              <Select value={filters.medicineId} onValueChange={(value) => setFilters({ ...filters, medicineId: value })}>
+              <Select
+                value={filters.medicineId}
+                onValueChange={(value) => setFilters({ ...filters, medicineId: value === CLEAR_SELECTION ? "" : value })}
+              >
                 <SelectTrigger id="medicineFilter" className="w-full">
                   <SelectValue placeholder="Tất cả thuốc" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tất cả thuốc</SelectItem>
+                  <SelectItem value={CLEAR_SELECTION}>Tất cả thuốc</SelectItem>
                   {medicines?.map((m) => (
                     <SelectItem key={m.id} value={m.id.toString()}>{m.name}</SelectItem>
                   ))}
@@ -81,12 +86,15 @@ export default function TransactionHistory() {
             </div>
             <div>
               <Label htmlFor="exportedBy">Người xuất</Label>
-              <Select value={filters.exportedBy} onValueChange={(value) => setFilters({ ...filters, exportedBy: value })}>
+              <Select
+                value={filters.exportedBy}
+                onValueChange={(value) => setFilters({ ...filters, exportedBy: value === CLEAR_SELECTION ? "" : value })}
+              >
                 <SelectTrigger id="exportedBy" className="w-full">
                   <SelectValue placeholder="Tất cả người xuất" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tất cả người xuất</SelectItem>
+                  <SelectItem value={CLEAR_SELECTION}>Tất cả người xuất</SelectItem>
                   {exporterNames.map((name) => (
                     <SelectItem key={name} value={name}>{name}</SelectItem>
                   ))}
