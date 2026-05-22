@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyHistoryState } from "./EmptyStates";
 
@@ -66,31 +67,31 @@ export default function TransactionHistory() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
               <Label htmlFor="medicineFilter">Tên thuốc</Label>
-              <select
-                id="medicineFilter"
-                value={filters.medicineId}
-                onChange={(e) => setFilters({ ...filters, medicineId: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm"
-              >
-                <option value="">Tất cả thuốc</option>
-                {medicines?.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
+              <Select value={filters.medicineId} onValueChange={(value) => setFilters({ ...filters, medicineId: value })}>
+                <SelectTrigger id="medicineFilter" className="w-full">
+                  <SelectValue placeholder="Tất cả thuốc" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Tất cả thuốc</SelectItem>
+                  {medicines?.map((m) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="exportedBy">Người xuất</Label>
-              <select
-                id="exportedBy"
-                value={filters.exportedBy}
-                onChange={(e) => setFilters({ ...filters, exportedBy: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm"
-              >
-                <option value="">Tất cả người xuất</option>
-                {exporterNames.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
+              <Select value={filters.exportedBy} onValueChange={(value) => setFilters({ ...filters, exportedBy: value })}>
+                <SelectTrigger id="exportedBy" className="w-full">
+                  <SelectValue placeholder="Tất cả người xuất" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Tất cả người xuất</SelectItem>
+                  {exporterNames.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="startDate">Từ ngày</Label>
